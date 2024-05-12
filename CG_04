@@ -4,7 +4,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <iostream>
-
+#include <assimp/material.h>
 // 광원 상태
 int light0_enabled = 0;
 int light1_enabled = 0;
@@ -21,18 +21,68 @@ void initModel(const char* filename) {
     }
 }
 
+void applyMaterial(const aiMaterial* material) {
+    aiColor4D diffuse;
+    aiColor4D specular;
+    aiColor4D ambient;
+    aiColor4D emission;
+    float shininess, strength;
+    int ret1, ret2;
+
+    // Ambient Color
+    if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_AMBIENT, &ambient))
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, (GLfloat*)&ambient);
+
+    // Diffuse Color
+    if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse))
+        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, (GLfloat*)&diffuse);
+
+    // Specular Color
+    if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_SPECULAR, &specular))
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, (GLfloat*)&specular);
+
+    // Emission Color
+    if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_EMISSIVE, &emission))
+        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (GLfloat*)&emission);
+
+    // Shininess
+    if (AI_SUCCESS == aiGetMaterialFloat(material, AI_MATKEY_SHININESS, &shininess)) {
+        // Check if shininess strength is also available
+        if (AI_SUCCESS == aiGetMaterialFloat(material, AI_MATKEY_SHININESS_STRENGTH, &strength))
+            shininess *= strength;
+
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
+    }
+}
 void renderModel() {
     if (scene) {
         glPushMatrix();
-        // 스케일 조정 - 모델 크기에 따라 조정 필요
-        glScalef(0.02f, 0.02f, 0.02f);
+        glScalef(1.0f, 1.0f, 1.0f);
 
         for (unsigned int n = 0; n < scene->mNumMeshes; ++n) {
             const aiMesh* mesh = scene->mMeshes[n];
+
+            // 재질 설정
+            const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+            applyMaterial(material);  // 이 함수는 재질 속성을 OpenGL에 설정하는 사용자 정의 함수입니다.
+
             glBegin(GL_TRIANGLES);
             for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
                 const aiFace& face = mesh->mFaces[i];
                 for (unsigned int j = 0; j < face.mNumIndices; j++) {
+                    // 노멀 설정
+                    if (mesh->HasNormals()) {
+                        aiVector3D normal = mesh->mNormals[face.mIndices[j]];
+                        glNormal3f(normal.x, normal.y, normal.z);
+                    }
+
+                    // 텍스처 좌표 설정
+                    if (mesh->HasTextureCoords(0)) {  // 첫 번째 텍스처 좌표 배열 사용
+                        aiVector3D texCoord = mesh->mTextureCoords[0][face.mIndices[j]];
+                        glTexCoord2f(texCoord.x, texCoord.y);
+                    }
+
+                    // 정점 위치 설정
                     aiVector3D vertex = mesh->mVertices[face.mIndices[j]];
                     glVertex3f(vertex.x, vertex.y, vertex.z);
                 }
@@ -62,7 +112,7 @@ void init() {
     glShadeModel(GL_SMOOTH);
 
     // 여기에서 파일명을 업데이트
-    initModel("C:\\Users\\pch\\bed-agape\\krv\\01kr_optim.obj"); // 모델 로드
+    initModel("C:\\Users\\pch\\cg4.obj"); // 모델 로드
 
 }
 void drawAxes() {
@@ -88,7 +138,7 @@ void drawAxes() {
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
-    gluLookAt(10.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    gluLookAt(5.0, 5.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
     glRotatef(rotationAngleZ, 0.0, 0.0, 1.0);
 
     // 축 그리기
